@@ -1,23 +1,17 @@
 import UIKit
-#if canImport(Flutter)
 import Flutter
-#endif
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-    #if canImport(Flutter)
     lazy var flutterEngine: FlutterEngine = {
         let engine = FlutterEngine(name: "shared_flutter_engine")
         engine.run()
         return engine
     }()
-    #endif
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        #if canImport(Flutter)
         _ = flutterEngine
-        #endif
         return true
     }
 

@@ -1,11 +1,8 @@
 import UIKit
-#if canImport(Flutter)
 import Flutter
-#endif
 
 enum FlutterEntryFactory {
     static func makeViewController(initialRoute: String = "/learning", title: String = "Flutter Page") -> UIViewController {
-        #if canImport(Flutter)
         guard
             let appDelegate = UIApplication.shared.delegate as? AppDelegate
         else {
@@ -21,9 +18,6 @@ enum FlutterEntryFactory {
         flutterViewController.setInitialRoute(initialRoute)
         FlutterBridgeCoordinator.bindFlutterViewController(flutterViewController)
         return flutterViewController
-        #else
-        return FlutterUnavailableViewController(reason: "当前工程还没有接入 Flutter SDK 或 Flutter module。")
-        #endif
     }
 }
 

@@ -1,7 +1,5 @@
 import UIKit
-#if canImport(Flutter)
 import Flutter
-#endif
 
 enum FlutterBridgeCoordinator {
     static let channelName = "com.huami.ios_flutter/demo"
@@ -11,7 +9,6 @@ enum FlutterBridgeCoordinator {
     private static var hostSyncCount = 0
     private static var lastFormResultSummary = "No Flutter form submitted yet."
 
-    #if canImport(Flutter)
     private static var channel: FlutterMethodChannel? {
         guard
             let appDelegate = UIApplication.shared.delegate as? AppDelegate
@@ -24,7 +21,6 @@ enum FlutterBridgeCoordinator {
             binaryMessenger: appDelegate.flutterEngine.binaryMessenger
         )
     }
-    #endif
 
     static func bindFlutterViewController(_ viewController: UIViewController) {
         flutterViewController = viewController
@@ -55,7 +51,6 @@ enum FlutterBridgeCoordinator {
     }
 
     private static func configureMethodChannel() {
-        #if canImport(Flutter)
         channel?.setMethodCallHandler { call, result in
             switch call.method {
             case "getHostSummary":
@@ -76,13 +71,10 @@ enum FlutterBridgeCoordinator {
                 result(FlutterMethodNotImplemented)
             }
         }
-        #endif
     }
 
     private static func pushHostStateToFlutter() {
-        #if canImport(Flutter)
         channel?.invokeMethod("hostCounterUpdated", arguments: currentHostSummary())
-        #endif
     }
 
     private static func showNativeAlert(message: String) {
