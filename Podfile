@@ -1,31 +1,51 @@
+source 'https://github.com/CocoaPods/Specs.git'
+
 platform :ios, '16.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'iOSFlutter.xcodeproj'
 
-flutter_application_path = File.expand_path('flutter_learning_demo', __dir__)
-flutter_podhelper_path = File.join(flutter_application_path, '.ios', 'Flutter', 'podhelper.rb')
+flutter_ios_path = File.expand_path('flutter_learning_demo/ios', __dir__)
+generated_xcode_build_settings_path = File.join(flutter_ios_path, 'Flutter', 'Generated.xcconfig')
 
-unless File.exist?(flutter_podhelper_path)
+unless File.exist?(generated_xcode_build_settings_path)
   raise <<~MESSAGE
     Flutter module is not ready yet.
 
     Expected:
-      #{flutter_podhelper_path}
+      #{generated_xcode_build_settings_path}
 
     Next step:
-      1. Install Flutter SDK
-      2. Run `flutter create --template module .` inside /Users/zf/Desktop/iOSFlutter/flutter_learning_demo
+      1. Run `flutter pub get` inside /Users/zf/Desktop/iOSFlutter/flutter_learning_demo
+      2. If `ios/` is missing, run `flutter create --template module .`
       3. Run `pod install` again from /Users/zf/Desktop/iOSFlutter
   MESSAGE
 end
 
-load flutter_podhelper_path
+def flutter_root(generated_xcode_build_settings_path)
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}"
+end
+
+require File.expand_path(
+  File.join('packages', 'flutter_tools', 'bin', 'podhelper'),
+  flutter_root(generated_xcode_build_settings_path)
+)
+
+flutter_ios_podfile_setup
 
 target 'iOSFlutter' do
   use_frameworks!
-  install_all_flutter_pods(flutter_application_path)
+  flutter_install_all_ios_pods(flutter_ios_path)
 end
 
 post_install do |installer|
-  flutter_post_install(installer) if defined?(flutter_post_install)
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
 end

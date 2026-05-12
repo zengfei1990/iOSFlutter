@@ -4,6 +4,10 @@ final class HostHomeViewController: UIViewController {
     private let introLabel = UILabel()
     private let detailsLabel = UILabel()
     private let openFlutterButton = UIButton(type: .system)
+    private let openFlutterFormButton = UIButton(type: .system)
+    private let syncStateButton = UIButton(type: .system)
+    private let syncCountLabel = UILabel()
+    private let lastFormResultLabel = UILabel()
     private let stepsLabel = UILabel()
 
     override func viewDidLoad() {
@@ -12,6 +16,11 @@ final class HostHomeViewController: UIViewController {
         view.backgroundColor = .systemBackground
         configureViews()
         buildLayout()
+        startObservingFlutterResults()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func configureViews() {
@@ -33,11 +42,41 @@ final class HostHomeViewController: UIViewController {
         openFlutterButton.configuration = configuration
         openFlutterButton.addTarget(self, action: #selector(openFlutterPage), for: .touchUpInside)
 
+        var formConfiguration = UIButton.Configuration.filled()
+        formConfiguration.title = "打开 Flutter 表单页"
+        formConfiguration.image = UIImage(systemName: "square.and.pencil")
+        formConfiguration.imagePadding = 8
+        formConfiguration.cornerStyle = .large
+        openFlutterFormButton.configuration = formConfiguration
+        openFlutterFormButton.addTarget(self, action: #selector(openFlutterFormPage), for: .touchUpInside)
+
+        var syncConfiguration = UIButton.Configuration.tinted()
+        syncConfiguration.title = "同步原生状态到 Flutter"
+        syncConfiguration.image = UIImage(systemName: "arrow.triangle.2.circlepath")
+        syncConfiguration.imagePadding = 8
+        syncConfiguration.cornerStyle = .large
+        syncStateButton.configuration = syncConfiguration
+        syncStateButton.addTarget(self, action: #selector(syncHostStateToFlutter), for: .touchUpInside)
+
+        syncCountLabel.font = .preferredFont(forTextStyle: .subheadline)
+        syncCountLabel.textColor = .secondaryLabel
+        syncCountLabel.numberOfLines = 0
+        updateSyncCountLabel()
+
+        lastFormResultLabel.font = .preferredFont(forTextStyle: .subheadline)
+        lastFormResultLabel.textColor = .label
+        lastFormResultLabel.numberOfLines = 0
+        lastFormResultLabel.layer.cornerRadius = 12
+        lastFormResultLabel.clipsToBounds = true
+        lastFormResultLabel.backgroundColor = .secondarySystemBackground
+        lastFormResultLabel.textAlignment = .left
+        updateLastFormResultLabel()
+
         stepsLabel.text = """
-        接下来你只需要：
-        1. 安装 Flutter SDK
-        2. 创建 Flutter module
-        3. 把 iOS 宿主接到 FlutterEngine
+        学习建议：
+        1. 先从原生页进入 Flutter
+        2. 再从原生页进入 Flutter 表单流
+        3. 观察 Flutter 如何把结果回传给原生
         """
         stepsLabel.font = .preferredFont(forTextStyle: .footnote)
         stepsLabel.textColor = .secondaryLabel
@@ -49,6 +88,10 @@ final class HostHomeViewController: UIViewController {
             introLabel,
             detailsLabel,
             openFlutterButton,
+            openFlutterFormButton,
+            syncStateButton,
+            syncCountLabel,
+            lastFormResultLabel,
             stepsLabel
         ])
         stackView.axis = .vertical
@@ -68,5 +111,42 @@ final class HostHomeViewController: UIViewController {
     private func openFlutterPage() {
         let viewController = FlutterEntryFactory.makeViewController()
         navigationController?.pushViewController(viewController, animated: true)
+    }
+
+    @objc
+    private func openFlutterFormPage() {
+        let viewController = FlutterEntryFactory.makeViewController(
+            initialRoute: "/profile-form",
+            title: "Flutter Form"
+        )
+        navigationController?.pushViewController(viewController, animated: true)
+    }
+
+    @objc
+    private func syncHostStateToFlutter() {
+        FlutterBridgeCoordinator.incrementHostSyncCount()
+        updateSyncCountLabel()
+    }
+
+    private func updateSyncCountLabel() {
+        syncCountLabel.text = "原生已主动同步 \(FlutterBridgeCoordinator.currentHostSyncCount()) 次状态到 Flutter。"
+    }
+
+    private func updateLastFormResultLabel() {
+        lastFormResultLabel.text = "最近一次 Flutter 表单结果：\n\(FlutterBridgeCoordinator.currentFormResultSummary())"
+    }
+
+    private func startObservingFlutterResults() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFlutterFormResultUpdated),
+            name: FlutterBridgeCoordinator.formResultDidUpdateNotification,
+            object: nil
+        )
+    }
+
+    @objc
+    private func handleFlutterFormResultUpdated() {
+        updateLastFormResultLabel()
     }
 }

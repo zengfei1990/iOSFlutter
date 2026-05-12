@@ -1,0 +1,16 @@
+PODS:
+  - Flutter (1.0.0)
+
+DEPENDENCIES:
+  - Flutter (from `flutter_learning_demo/ios/Flutter`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: flutter_learning_demo/ios/Flutter
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+
+PODFILE CHECKSUM: 513d9a5a4d7d12d7efed6292f5fccadd61943e35
+
+COCOAPODS: 1.16.2

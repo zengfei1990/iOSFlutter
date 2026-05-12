@@ -4,7 +4,7 @@ import Flutter
 #endif
 
 enum FlutterEntryFactory {
-    static func makeViewController() -> UIViewController {
+    static func makeViewController(initialRoute: String = "/learning", title: String = "Flutter Page") -> UIViewController {
         #if canImport(Flutter)
         guard
             let appDelegate = UIApplication.shared.delegate as? AppDelegate
@@ -17,8 +17,9 @@ enum FlutterEntryFactory {
             nibName: nil,
             bundle: nil
         )
-        flutterViewController.title = "Flutter Page"
-        flutterViewController.setInitialRoute("/learning")
+        flutterViewController.title = title
+        flutterViewController.setInitialRoute(initialRoute)
+        FlutterBridgeCoordinator.bindFlutterViewController(flutterViewController)
         return flutterViewController
         #else
         return FlutterUnavailableViewController(reason: "当前工程还没有接入 Flutter SDK 或 Flutter module。")

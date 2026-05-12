@@ -1,0 +1,14 @@
+.DS_Store
+
+# Xcode user data
+**/xcuserdata/
+**/*.xcuserstate
+
+# IntelliJ / Android Studio
+**/*.iml
+
+# Local Android SDK config
+**/local.properties
+
+# Generated Flutter iOS helper files
+flutter_learning_demo/ios/Flutter/ephemeral/

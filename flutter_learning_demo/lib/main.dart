@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   runApp(const CrossPlatformApp());
@@ -31,6 +32,11 @@ class CrossPlatformApp extends StatelessWidget {
               builder: (_) => const HostIntegrationPage(),
               settings: settings,
             );
+          case '/profile-form':
+            return MaterialPageRoute<void>(
+              builder: (_) => const ProfileFormPage(),
+              settings: settings,
+            );
           default:
             return MaterialPageRoute<void>(
               builder: (_) => UnknownRoutePage(routeName: settings.name ?? 'unknown'),
@@ -51,7 +57,14 @@ class LearningHomePage extends StatefulWidget {
 }
 
 class _LearningHomePageState extends State<LearningHomePage> {
+  static const MethodChannel _hostChannel = MethodChannel(
+    'com.huami.ios_flutter/demo',
+  );
+
   int completedTopics = 1;
+  int hostSyncCount = 0;
+  String hostPlatform = 'Unknown';
+  String hostMessage = 'No native payload received yet.';
 
   final List<LearningTopic> topics = const [
     LearningTopic(
@@ -75,6 +88,19 @@ class _LearningHomePageState extends State<LearningHomePage> {
       icon: Icons.settings_ethernet_outlined,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _hostChannel.setMethodCallHandler(_handleHostMethodCall);
+    _loadHostSummary();
+  }
+
+  @override
+  void dispose() {
+    _hostChannel.setMethodCallHandler(null);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +129,15 @@ class _LearningHomePageState extends State<LearningHomePage> {
           PlatformSummaryCard(
             platformLabel: platformLabel,
             completedTopics: completedTopics,
+          ),
+          const SizedBox(height: 12),
+          HostBridgeCard(
+            hostPlatform: hostPlatform,
+            hostSyncCount: hostSyncCount,
+            hostMessage: hostMessage,
+            onRefreshFromHost: _loadHostSummary,
+            onShowNativeNotice: _showNativeNotice,
+            onCloseFlutterPage: _closeFlutterPage,
           ),
           const SizedBox(height: 20),
           Text(
@@ -149,6 +184,13 @@ class _LearningHomePageState extends State<LearningHomePage> {
             },
             child: const Text('See host integration notes'),
           ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pushNamed('/profile-form');
+            },
+            child: const Text('Open Flutter form flow'),
+          ),
         ],
       ),
     );
@@ -161,6 +203,82 @@ class _LearningHomePageState extends State<LearningHomePage> {
 
     setState(() {
       completedTopics += 1;
+    });
+  }
+
+  Future<void> _loadHostSummary() async {
+    try {
+      final summary = await _hostChannel.invokeMapMethod<String, dynamic>(
+        'getHostSummary',
+      );
+      _applyHostSummary(summary);
+    } on PlatformException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        hostMessage = 'Failed to fetch native host summary.';
+      });
+    }
+  }
+
+  Future<void> _showNativeNotice() async {
+    try {
+      await _hostChannel.invokeMethod<String>('showNativeNotice', {
+        'message': 'Flutter called into native iOS successfully.',
+      });
+    } on PlatformException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        hostMessage = 'Native notice failed to display.';
+      });
+    }
+  }
+
+  Future<void> _closeFlutterPage() async {
+    try {
+      await _hostChannel.invokeMethod<String>('closeFlutterPage');
+    } on PlatformException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        hostMessage = 'Flutter could not request page close.';
+      });
+    }
+  }
+
+  Future<void> _handleHostMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'hostCounterUpdated':
+        final arguments = Map<String, dynamic>.from(
+          (call.arguments as Map?) ?? const <String, dynamic>{},
+        );
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          hostSyncCount = (arguments['hostSyncCount'] as num?)?.toInt() ?? hostSyncCount;
+          hostPlatform = arguments['hostPlatform'] as String? ?? hostPlatform;
+          hostMessage = arguments['hostMessage'] as String? ?? hostMessage;
+        });
+        return;
+      default:
+        return;
+    }
+  }
+
+  void _applyHostSummary(Map<String, dynamic>? summary) {
+    if (!mounted || summary == null) {
+      return;
+    }
+
+    setState(() {
+      hostSyncCount = (summary['hostSyncCount'] as num?)?.toInt() ?? hostSyncCount;
+      hostPlatform = summary['hostPlatform'] as String? ?? hostPlatform;
+      hostMessage = summary['hostMessage'] as String? ?? hostMessage;
     });
   }
 
@@ -221,6 +339,222 @@ class PlatformSummaryCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class HostBridgeCard extends StatelessWidget {
+  const HostBridgeCard({
+    super.key,
+    required this.hostPlatform,
+    required this.hostSyncCount,
+    required this.hostMessage,
+    required this.onRefreshFromHost,
+    required this.onShowNativeNotice,
+    required this.onCloseFlutterPage,
+  });
+
+  final String hostPlatform;
+  final int hostSyncCount;
+  final String hostMessage;
+  final Future<void> Function() onRefreshFromHost;
+  final Future<void> Function() onShowNativeNotice;
+  final Future<void> Function() onCloseFlutterPage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Host bridge demo',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Text('Native platform: $hostPlatform'),
+            Text('Host sync count: $hostSyncCount'),
+            const SizedBox(height: 8),
+            Text(hostMessage),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton(
+                  onPressed: onRefreshFromHost,
+                  child: const Text('Read native state'),
+                ),
+                OutlinedButton(
+                  onPressed: onShowNativeNotice,
+                  child: const Text('Show native alert'),
+                ),
+                OutlinedButton(
+                  onPressed: onCloseFlutterPage,
+                  child: const Text('Ask host to close'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ProfileFormPage extends StatefulWidget {
+  const ProfileFormPage({super.key});
+
+  @override
+  State<ProfileFormPage> createState() => _ProfileFormPageState();
+}
+
+class _ProfileFormPageState extends State<ProfileFormPage> {
+  static const MethodChannel _hostChannel = MethodChannel(
+    'com.huami.ios_flutter/demo',
+  );
+
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _goalController = TextEditingController();
+  String _selectedRole = 'iOS Developer';
+  bool _newsletterEnabled = true;
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _goalController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Flutter Form Flow')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text(
+              'This page simulates a real add-to-app form flow: native opens Flutter, Flutter collects input, then sends the result back to native.',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter a name';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedRole,
+              decoration: const InputDecoration(
+                labelText: 'Role',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'iOS Developer',
+                  child: Text('iOS Developer'),
+                ),
+                DropdownMenuItem(
+                  value: 'Flutter Developer',
+                  child: Text('Flutter Developer'),
+                ),
+                DropdownMenuItem(
+                  value: 'Product Designer',
+                  child: Text('Product Designer'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() {
+                  _selectedRole = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _goalController,
+              decoration: const InputDecoration(
+                labelText: 'Learning goal',
+                hintText: 'For example: Understand add-to-app and method channels',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter a learning goal';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Subscribe to Flutter updates'),
+              value: _newsletterEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _newsletterEnabled = value;
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _isSubmitting ? null : _submitToHost,
+              child: Text(_isSubmitting ? 'Submitting...' : 'Submit to native host'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitToHost() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await _hostChannel.invokeMethod<String>('submitProfileForm', {
+        'name': _nameController.text.trim(),
+        'role': _selectedRole,
+        'goal': _goalController.text.trim(),
+        'newsletterEnabled': _newsletterEnabled,
+      });
+      await _hostChannel.invokeMethod<String>('closeFlutterPage');
+    } on PlatformException {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to send the form result to native host.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 }
 
